@@ -2,118 +2,157 @@
 #include <string>
 #include <iostream>
 #include <functional>
+#include <memory>
 
-// create a "sequence" type of iterator that calls a function to obtain a value
 template <typename T>
-class Sequence {
-public:
-    typedef std::function<T(std::size_t)> Generator;
-private:
-    std::size_t index;
-    Generator generator;
-public:
-    Sequence(std::size_t _index, const Generator& _generator)
-        : index(_index), generator(_generator) {}
-
-    T operator*() const { return generator(index); }
-
-    Sequence& operator++() {
-        ++index;
-        return *this;
+std::vector<T> generate(std::size_t n, std::function<T(std::size_t)> generator)
+{
+    std::vector<T> ans;
+    ans.reserve(n);
+    for (std::size_t i=0; i<n; ++i) {
+        ans.push_back(generator(i));
     }
-
-    // Adding comparison operators for iterator functionality
-    bool operator==(const Sequence& other) const { return index == other.index; }
-    bool operator!=(const Sequence& other) const { return !(*this == other); }
-};
-
-// use the Sequence to generate a vector from a lambda function
-template <typename T>
-std::vector<T> generate(std::size_t n, const typename Sequence<T>::Generator& generator) {
-    return std::vector < T > (Sequence(0,generator),Sequence(n,generator));
+    return ans;
 }
 
-struct Chair {
-    const double x,y;
+class Chair
+{
+public:
+    typedef std::shared_ptr<Chair> Ptr;
+public:
+    typedef std::function<Ptr (std::size_t)> Generator;
+
+    const double x, y;
     const std::string occupant;
-    Chair(double _x, double _y, std::string _occupant="") 
+
+private:
+    Chair(double _x, double _y, std::string _occupant = "")
         : x(_x), y(_y), occupant(_occupant) {}
-    void report(std::ostream &out) const {
-        if (occupant != "") {
+
+public:
+    void report(std::ostream &out) const
+    {
+        if (occupant != "")
+        {
             out << "chair at (" << x << "," << y << ") with " << occupant << std::endl;
-        } else {
+        }
+        else
+        {
             out << "chair at (" << x << "," << y << ")" << std::endl;
         }
     }
 
-    Chair move(double x, double y) const {
-        return Chair(x,y,occupant);
-
+public:
+    Ptr move(double x, double y) const
+    {
+        return Ptr(new Chair(x, y, occupant));
     }
 
-    Chair occupy(std::string occupant) const {
-        return Chair(x,y,occupant);
+public:
+    Ptr occupy(std::string occupant) const
+    {
+        return Ptr(new Chair(x, y, occupant));
     }
 
-    Chair leave() const {
-        return Chair(x,y);
+public:
+    Ptr leave() const
+    {
+        return Ptr(new Chair(x, y));
+    }
+
+public:
+    static Ptr build(double x, double y, const std::string &occupant = "")
+    {
+        return Ptr(new Chair(x, y, occupant));
     }
 };
 
+class Room
+{
+public:
+    typedef std::shared_ptr<Room> Ptr;
 
-struct Room {
-    const std::vector < Chair > chairs;
-    Room() {}
-    Room(const std::vector < Chair > &_chairs) : chairs(_chairs) {}
-    Room(int rows, double depth, int cols, double width) 
-    : chairs(Sequence(0,grid(rows,depth,cols,width)) {}
+public:
+    const std::vector<Chair::Ptr> chairs;
 
-    static Sequence<Chair>::Generator gridGenerator(int rows, double depth, int cols, double width) {
-        auto row = [cols](std::size_t i) { return i / cols; };
-        auto col = [cols](std::size_t i) { return i % cols; };
-        auto x = [width,cols,col](std::size_t i) { return width*col(i)/cols; };
-        auto y = [depth,rows,row](std::size_t i) { return depth*row(i)/rows; };
-        return [x,y](std::size_t i) { return Chair(x(i),y(i)); };
+private:
+    Room(std::size_t size, Chair::Generator generator) 
+        : chairs(generate(size, generator)) {}
+
+private:
+    Room(int rows, double depth, int cols, double width)
+        : Room(rows*cols, gridGenerator(rows, depth, cols, width)) {}
+
+private:
+    static Chair::Generator gridGenerator(int rows, double depth, int cols, double width)
+    {
+        auto row = [cols](std::size_t i)
+        { return i / cols; };
+        auto col = [cols](std::size_t i)
+        { return i % cols; };
+        auto x = [width, cols, col](std::size_t i)
+        { return width * col(i) / cols; };
+        auto y = [depth, rows, row](std::size_t i)
+        { return depth * row(i) / rows; };
+        auto generator = [x, y](std::size_t i)
+        { return Chair::build(x(i), y(i)); };
+        return generator;
     }
 
-    Room adjust(int location, const Chair &adjusted) const {
-        auto generator = [&](std::size_t index) { 
+public:
+    Ptr adjust(int location, const Chair::Ptr &adjusted) const
+    {
+        auto generator = [&](std::size_t index)
+        {
             return (index != location) ? chairs.at(index) : adjusted;
         };
-        return Room(generate<Chair>(chairs.size(),generator));
+        return Ptr(new Room(chairs.size(), generator));
     }
 
-    Room move(int location, double x, double y) const {
-        return adjust(location,chairs.at(location).move(x,y));
+public:
+    Ptr move(int location, double x, double y) const
+    {
+        return adjust(location, chairs.at(location)->move(x, y));
     }
 
-    Room occupy(int location, std::string occupant) const {
-        return adjust(location,chairs.at(location).occupy(occupant));
+public:
+    Ptr occupy(int location, std::string occupant) const
+    {
+        return adjust(location, chairs.at(location)->occupy(occupant));
     }
 
-    Room leave(int location) const {
-        return adjust(location,chairs.at(location).leave());
+public:
+    Ptr leave(int location) const
+    {
+        return adjust(location, chairs.at(location)->leave());
     }
 
-    void report(std::ostream &out) const {
-        for (auto &chair : chairs) {
-            chair.report(out);
+public:
+    void report(std::ostream &out) const
+    {
+        for (auto &chair : chairs)
+        {
+            chair->report(out);
         }
+    }
+
+public:
+    static Ptr build(int rows, double depth, int cols, double width)
+    {
+        return Ptr(new Room(rows, depth, cols, width));
     }
 };
 
-int main() {
+int main()
+{
     int rows = 4;
     int cols = 12;
     double width = 50;
     double depth = 30;
-    Room room1;
-    Room room2;
 
-    room1.arrange(rows,depth,cols,width);
-    room1.move(3,0,0);
-    room1.occupy(5,"alice");
-
-    room1.report(std::cout);
+    Room::Ptr room = Room::build(rows, depth, cols, width);
+    room->report(std::cout);
+    room = room->move(3,33,33);
+    room = room->occupy(8,"alice");
+    room->report(std::cout);
 }
-

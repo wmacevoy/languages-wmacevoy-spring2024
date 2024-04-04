@@ -88,10 +88,19 @@ RSpec.describe 'Regular Expression Matcher for _ or letter or 0..9' do
   end
 end
 
+# Turns out ruby does allow composition...
+
 RSpec.describe 'Regular Expression Matcher C++ id' do
-  let(:pattern) { /^(_|\p{L}|[0-9])(_|\p{L}|[0-9])*$/ }
-  let(:should_pass) { ['_','A','x','Δ','1'] }
-  let(:should_fail) { ['*'] }
+  let(:letter) { /\p{L}/ }
+  let(:digit) { /[0-9]/ }
+  let(:underscore) { /_/ }
+  let(:id_start) { /(#{letter}|#{underscore})/ }
+  let(:id_after) { /(#{letter}|#{underscore}|#{digit})/ }
+  let(:id) { /#{id_start}#{id_after}*/ }
+
+  let(:pattern) { /^#{id}$/ }
+  let(:should_pass) { ['_','A','my_id','Δx3','CamelCase'] }
+  let(:should_fail) { ['*','1', '1x','' ] }
 
   describe 'should pass' do
     it 'matches all expected strings' do
@@ -109,4 +118,3 @@ RSpec.describe 'Regular Expression Matcher C++ id' do
     end
   end
 end
-

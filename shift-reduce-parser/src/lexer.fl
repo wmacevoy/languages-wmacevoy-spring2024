@@ -1,0 +1,122 @@
+%option reentrant stack noyywrap
+%option extra-type="calc::Lexer *"
+%{
+#include <sstream>
+#include <fstream>
+#include "token.h"
+#include "lexer.h"
+
+#define YY_DECL Token::Ptr yylex(yyscan_t yyscanner)
+#define YY_INPUT(buf,result,max_size) { yyextra->in->read(buf,max_size); result = yyextra->in->gcount(); }
+
+using namespace calc;
+using namespace std;
+%}
+
+WS  [ ]+
+ADD [+]
+MUL [*]
+NUM (0|-?[1-9](_?[0-9]+)*)(\.[0-9](_?[0-9]+)*)?
+ID [A-Za-z][A-Za-z0-9_]*
+LP [(]
+RP [)]
+LINE \r?\n
+
+%%
+{WS}      {
+   yyextra->column += strlen(yytext);
+}
+
+{ADD}     {
+   auto token = Token::add(yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+{MUL}     {
+   auto token = Token::mul(yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+
+{NUM}     {
+   auto token = Token::num(yytext,yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+
+{ID}     {
+   auto token = Token::id(yytext,yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+{LP}      {
+   auto token = Token::lp(yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+{RP}      {
+   auto token = Token::rp(yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column += strlen(yytext);
+   return token;
+}
+
+{LINE}    {
+   auto token = Token::eol(yyextra->file,yyextra->line,yyextra->column);
+   yyextra->column = 1;
+   yyextra->line += 1;
+   return token;
+}
+
+<<EOF>>   {
+   auto token = Token::end(yyextra->file,yyextra->line,yyextra->column);
+   return token;
+}
+%%
+
+namespace calc {
+  Lexer::Lexer()
+  : line(1), column(1) {
+    yylex_init_extra(this,&yyscanner);
+  }
+
+  Lexer::~Lexer() {
+    FILE *in = yyget_in(yyscanner);
+    fclose(in);
+    yylex_destroy(yyscanner);
+  }
+
+  Token::Ptr Lexer::next() {
+    auto token = yylex(yyscanner);
+    cout << "Lexer@"<<((void*)this)<<"::next()=" << token << endl;
+    return token;
+  }
+
+  Lexer::Ptr Lexer::fromFile(const std::string &filename) {
+    Lexer::Ptr ans(new Lexer());
+    ans->file = filename;
+    ans->in = std::shared_ptr < std::istream > (new std::ifstream(filename));
+    return ans;
+  }
+  
+  Lexer::Ptr Lexer::fromStdin() {
+    Lexer::Ptr ans(new Lexer());
+    ans->file = "stdin";
+    ans->in = std::shared_ptr < std::istream > (&std::cin,[](std::istream*){});
+    return ans;
+  }
+  
+  Lexer::Ptr Lexer::fromString(const std::string &value) {
+    Lexer::Ptr ans(new Lexer());
+    ans->file += "'";
+    ans->file += value;
+    ans->file += "'";    
+    ans->in = std::shared_ptr < std::istream > (new std::istringstream(value));
+    return ans;
+  }
+
+}

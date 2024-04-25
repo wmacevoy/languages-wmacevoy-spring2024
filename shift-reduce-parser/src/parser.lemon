@@ -1,0 +1,66 @@
+/* https://sqlite.org/src/doc/trunk/doc/lemon.html */
+
+%name CalcLemonParser
+%extra_argument { calc::Parser *me }
+
+%token ADD SUB MUL DIV LP RP EOL END.
+
+%token_type { calc::Token * }
+%token_destructor { delete $$; }
+%token_prefix    CALC_TOKEN_
+
+%left ADD SUB.
+%left MUL DIV.
+
+%include {
+#include "token.h"
+#include "parsetree.h"
+#include "parser.h"
+
+using namespace calc;
+
+static calc::ParseTree::Ptr nt(calc::ParseTree *ptp) { return calc::ParseTree::Ptr(ptp); }
+static calc::Token::Ptr tk(calc::Token *tkp) { return calc::Token::Ptr(tkp); }
+}
+
+%start_symbol s
+s ::= e(E). { me->result = nt(E); }
+
+%type e { calc::ParseTree * }
+%destructor e { delete $$; }
+e(A) ::= t(T) ADD(add) e(E). { A = ParseTree::e_add(nt(E),tk(add),nt(T)); }
+e(A) ::= t(T). { A = ParseTree::e_t(nt(T)); }
+
+%type t { calc::ParseTree * }
+%destructor t { delete $$; }
+t(A) ::= f(F). { A = ParseTree::t_f(nt(F)); }
+  
+%type f { calc::ParseTree * }
+%destructor f { delete $$; }
+f(A) ::= NUM(num). { A = ParseTree::f_num(tk(num)); }
+
+%code {
+namespace calc {
+  Parser::Parser(Lexer::Ptr _lexer) : lexer(_lexer) {
+    lemon = CalcLemonParserAlloc(malloc);
+  }
+
+  void keep(Token *tkp) {};
+  void keep(Parser *pp) {};  
+  ParseTree::Ptr Parser::parse() {
+    for (;;) {
+      Token::Ptr token(lexer->next(),keep);
+      Token *tkp = token.get();
+      int32_t type = tkp->type;
+      CalcLemonParser(lemon,type,tkp,this);
+      if (type == Token::END) break;
+    }
+    CalcLemonParser(lemon,0,nullptr,this);
+    return result;
+  }
+
+  Parser::~Parser() {
+    CalcLemonParserFree(lemon,free);
+  }
+}
+}

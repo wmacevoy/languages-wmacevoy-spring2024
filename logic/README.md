@@ -1,4 +1,4 @@
-# Proglog
+# Prolog
 
 To run
 

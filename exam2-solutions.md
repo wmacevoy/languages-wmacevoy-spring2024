@@ -1,12 +1,14 @@
 # Languages Exam 2
 
+## Everyone got +5% because some questions were harder than I planned.
+
 1. What does the expression `(a|b)(ab)*(ba)?` match?
 
 * Either an "a" or a "b"
 * Zero or more "ab"'s
 * An optional "ba"
 
-So a, b, aba, bba, aab, bab, ...
+So `a`, `b`, `aba`, `bba`, `aab`, `bab`, ...
 
 2. Tokens are usually described by regular expressions.  But what are tokens for?
 
@@ -50,7 +52,7 @@ id --> /[a-z]+/
 
 5. What are the two main kinds of parsers?
 
-Recursive descent, which are hand made and breaks on left recursive grammars.
+Recursive descent, which are hand made and break on left recursive grammars.
 
 Shift-reduce, which are built with tool assistance (like flex/bison), and are inefficient
 on right recursive grammars.
